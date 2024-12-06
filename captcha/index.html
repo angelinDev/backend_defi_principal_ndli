@@ -252,10 +252,14 @@
         // Handle trash logic (game over or score increase)
         function handleTrash(obj) {
             if (obj.type === 'good') {
-                // Game Over if a good object is dragged to trash can
+                // Game Over if a good object is dragged to the trash can
                 gameOver = true;
-                alert("Game Over! Restarting...");
-                restartGame();
+                document.body.innerHTML = `
+                    <h1 style="font-family: 'A Note', sans-serif; color: black; text-align: center; margin-top: 50px;">RATÉ !</h1>
+                    <p style="text-align: center;">Veuillez   réessayer.</p>`;
+                setTimeout(() => {
+                    restartGame();
+                }, 2000); // Restart the game after 2 seconds
             } else if (obj.type === 'bad') {
                 // Increase score for bad objects (trash bags)
                 score++;
@@ -267,11 +271,14 @@
 
                 // Check if all bad objects are removed
                 if (badObjectsRemoved === badObjectsTotal) {
-                    alert("Congratulations! You have removed all the bad objects. Redirecting...");
-                    window.location.href = "https://www.google.com"; // Redirect to Google
+                    document.body.innerHTML = `<h1 style="font-family: 'A Note', sans-serif; color: black; text-align: center; margin-top: 50px;">BIENVENUE, HUMAIN !</h1>`;
+                    setTimeout(() => {
+                        window.location.href = "https://www.google.com"; // Redirect to your target page
+                    }, 2000); // Redirect after 2 seconds
                 }
             }
         }
+
 
         // Remove object from the game
         function removeObject(obj) {
