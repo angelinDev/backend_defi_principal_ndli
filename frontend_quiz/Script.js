@@ -57,7 +57,7 @@ function checkAnswer(selectedIndex) {
     feedbackElement.classList.add("animated");
 
     gabagges.forEach((gabagge) => {
-        gabagge.classList.add("animated");
+      gabagge.classList.add("animated");
     });
 
     failures++;
