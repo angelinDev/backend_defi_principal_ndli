@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Captcha</title>
+    <style>
+        @font-face {
+            font-family: 'A Note'; 
+            src: url('./A Note.ttf') format('truetype');
+            font-weight: normal; 
+            font-style: normal; 
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'A Note', Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: white;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #game-area {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: 2px solid #ccc;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0; /* Render behind the images */
+        }
+
+        .object-container {
+            position: absolute;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 60px;
+            height: 60px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+            cursor: grab;
+            z-index: 10;
+        }
+
+        .object-image {
+            width: 50px;
+            height: 50px;
+            background-size: cover;
+            background-position: center;
+            border-radius: 5px;
+        }
+
+        /* Trash can style with logo */
+        #trash-can {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 80px;
+            height: 80px;
+            background-image: url('./images/trashcan.gif'); 
+            background-size: contain; /* Ensure the image fits within the container */
+            background-position: center;
+            background-repeat: no-repeat;
+            z-index: 20;
+            cursor: pointer;
+        }
+
+        #score {
+            font-size: 24px;
+            margin-top: 20px;
+            z-index: 30; /* Ensure it stays above the game area */
+        }
+    </style>
+</head>
+<body>
+    <h1>ÊTES VOUS HUMAIN ?</h1>
+    <p>Glissez les déchets dans la poubelle</p>
+    <p id="score">Score: 0</p>
+    <div id="game-area">
+        <canvas id="background"></canvas>
+        <div id="trash-can"></div> <!-- Trash can element with logo -->
+    </div>
+
+    <script>
+        const container = document.getElementById('game-area');
+        const canvas = document.getElementById('background');
+        const trashCan = document.getElementById('trash-can');
+        const scoreDisplay = document.getElementById('score');
+        const ctx = canvas.getContext('2d');
+        const objects = [];
+        let dots = [];
+        let score = 0;
+        let gameOver = false;
+        let badObjectsRemoved = 0;  // Counter for removed bad objects
+        const dotCount = 90; // Number of dots
+        const dotSpeed = 0.09; // Speed of dot animation
+
+        const badObjectsTotal = 5; // Total number of bad objects to track for game completion
+
+        // Resize canvas to fit the container
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            generateDots(); // Recalculate dots on resize
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // Generate random dots with positions and movement directions
+        function generateDots() {
+            dots = [];
+            for (let i = 0; i < dotCount; i++) {
+                dots.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    dx: (Math.random() - 0.5) * dotSpeed, // Smaller random speed
+                    dy: (Math.random() - 0.5) * dotSpeed,
+                });
+            }
+        }
+
+        // Draw dots and animate them
+        function drawBackground() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            dots.forEach(dot => {
+                // Update dot position
+                dot.x += dot.dx;
+                dot.y += dot.dy;
+
+                // Reverse direction if a dot hits the canvas boundaries
+                if (dot.x < 0 || dot.x > canvas.width) dot.dx *= -1;
+                if (dot.y < 0 || dot.y > canvas.height) dot.dy *= -1;
+
+                // Draw the dot
+                ctx.beginPath();
+                ctx.arc(dot.x, dot.y, 2, 0, Math.PI * 2);
+                ctx.fillStyle = "#aaa";
+                ctx.fill();
+
+                // Draw lines connecting nearby objects
+                objects.forEach(obj => {
+                    const dx = dot.x - (obj.x + 30);
+                    const dy = dot.y - (obj.y + 30);
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+
+                    if (distance < 100) {
+                        ctx.beginPath();
+                        ctx.moveTo(dot.x, dot.y);
+                        ctx.lineTo(obj.x + 30, obj.y + 30);
+                        ctx.strokeStyle = "#ccc";
+                        ctx.lineWidth = 0.5;
+                        ctx.stroke();
+                    }
+                });
+            });
+
+            requestAnimationFrame(drawBackground);
+        }
+
+        // Add draggable objects with trash bags as "bad" items
+        function spawnObject(imageUrl, type) {
+            const objectContainer = document.createElement('div');
+            objectContainer.classList.add('object-container');
+
+            const objectImage = document.createElement('div');
+            objectImage.classList.add('object-image');
+            objectImage.style.backgroundImage = `url(${imageUrl})`;
+
+            objectContainer.appendChild(objectImage);
+            container.appendChild(objectContainer);
+
+            objectContainer.style.top = Math.random() * (container.offsetHeight - 60) + 'px';
+            objectContainer.style.left = Math.random() * (container.offsetWidth - 60) + 'px';
+
+            makeDraggable(objectContainer, type);
+
+            objects.push({
+                element: objectContainer,
+                x: objectContainer.offsetLeft,
+                y: objectContainer.offsetTop,
+                type: type // Type can be 'good' or 'bad'
+            });
+        }
+
+        // Function to make elements draggable
+        function makeDraggable(element, type) {
+            let offsetX = 0, offsetY = 0, startX = 0, startY = 0;
+
+            element.addEventListener('mousedown', (e) => {
+                startX = e.clientX;
+                startY = e.clientY;
+
+                function mouseMove(e) {
+                    offsetX = startX - e.clientX;
+                    offsetY = startY - e.clientY;
+
+                    startX = e.clientX;
+                    startY = e.clientY;
+
+                    element.style.top = (element.offsetTop - offsetY) + 'px';
+                    element.style.left = (element.offsetLeft - offsetX) + 'px';
+
+                    // Update object position
+                    const obj = objects.find(o => o.element === element);
+                    obj.x = element.offsetLeft;
+                    obj.y = element.offsetTop;
+
+                    // Check for collision with trash can
+                    if (isInTrashCan(element)) {
+                        handleTrash(obj);
+                    }
+                }
+
+                function mouseUp() {
+                    document.removeEventListener('mousemove', mouseMove);
+                    document.removeEventListener('mouseup', mouseUp);
+                }
+
+                document.addEventListener('mousemove', mouseMove);
+                document.addEventListener('mouseup', mouseUp);
+            });
+        }
+
+        // Check if object is in trash can area
+        function isInTrashCan(element) {
+            const trashRect = trashCan.getBoundingClientRect();
+            const objectRect = element.getBoundingClientRect();
+
+            return objectRect.right > trashRect.left &&
+                objectRect.left < trashRect.right &&
+                objectRect.bottom > trashRect.top &&
+                objectRect.top < trashRect.bottom;
+        }
+
+        // Handle trash logic (game over or score increase)
+        function handleTrash(obj) {
+            if (obj.type === 'good') {
+                // Game Over if a good object is dragged to trash can
+                gameOver = true;
+                alert("Game Over! Restarting...");
+                restartGame();
+            } else if (obj.type === 'bad') {
+                // Increase score for bad objects (trash bags)
+                score++;
+                badObjectsRemoved++;
+                scoreDisplay.textContent = `Score: ${score}`;
+
+                // Remove object from the game
+                removeObject(obj);
+
+                // Check if all bad objects are removed
+                if (badObjectsRemoved === badObjectsTotal) {
+                    alert("Congratulations! You have removed all the bad objects. Redirecting...");
+                    window.location.href = "https://www.google.com"; // Redirect to Google
+                }
+            }
+        }
+
+        // Remove object from the game
+        function removeObject(obj) {
+            obj.element.remove();
+            const index = objects.indexOf(obj);
+            if (index > -1) {
+                objects.splice(index, 1);
+            }
+        }
+
+        // Restart the game
+        function restartGame() {
+            score = 0;
+            badObjectsRemoved = 0;
+            scoreDisplay.textContent = `Score: ${score}`;
+            gameOver = false;
+            objects.forEach(obj => obj.element.remove());
+            objects.length = 0;
+            spawnObjects();
+        }
+
+        // Spawn only trash bags as bad objects and other good items
+        function spawnObjects() {
+            spawnObject('./images/trashbag.png', 'bad');  // Replace with your trash bag image URL
+            spawnObject('./images/trashbag.png', 'bad');
+            spawnObject('./images/trashbag.png', 'bad');
+            spawnObject('./images/trashbag.png', 'bad');
+            spawnObject('./images/trashbag.png', 'bad');
+            spawnObject('./images/starfish.png', 'good');
+            spawnObject('./images/fish.png', 'good');
+            spawnObject('./images/seahorse.png', 'good');
+            spawnObject('./images/turtle.png', 'good');
+            spawnObject('./images/dolphin.png', 'good');
+        }
+
+        // Start the game
+        window.onload = () => {
+            spawnObjects();
+            drawBackground();
+        };
+    </script>
+</body>
+</html>
