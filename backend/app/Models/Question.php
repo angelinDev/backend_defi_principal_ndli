@@ -9,4 +9,9 @@ class Question extends Model
     protected $fillable = [
         'question'
     ];
+
+    public function reponses()
+    {
+        return $this->hasMany(Reponse::class, 'question_id');
+    }
 }
